@@ -75,18 +75,17 @@ def simulate_trading(agent, data, money=10000, stock=0):
     return portfolio_values
 
 # Download SPY stock data
-data = yf.download('SPY','2010-01-01','2023-12-31')['Close']
+data = yf.download('SPY','2000-01-01','2023-12-31')['Close']
 
 # Normalize the data
 data = (data - data.min()) / (data.max() - data.min())
 
 # Split the data into training and testing data
-train_data = data['2010-01-01':'2020-12-31']
-test_data = data['2021-01-01':'2023-12-31']
+train_data = data['2000-01-01':'2014-12-31']
+test_data = data['2015-01-01':'2023-12-31']
 
 # Create and train the agent
 agent = Agent(lr=0.01, gamma=0.95, e_start=1.0, e_end=0.01, e_decay=0.995)
-train_portfolio_values = simulate_trading(agent, train_data)
 
 # Test the agent
 train_portfolio_values = [10000] + simulate_trading(agent, train_data)
