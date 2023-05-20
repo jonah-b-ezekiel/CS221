@@ -75,10 +75,10 @@ def simulate_trading(agent, data, money=10000, stock=0):
     return portfolio_values
 
 # Download SPY stock data
-data = yf.download('SPY','2000-01-01','2023-12-31')['Close']
+raw_data = yf.download('SPY','2000-01-01','2023-12-31')['Close']
 
 # Normalize the data
-data = (data - data.min()) / (data.max() - data.min())
+data = (raw_data - raw_data.min()) / (raw_data.max() - raw_data.min())
 
 # Split the data into training and testing data
 train_data = data['2000-01-01':'2014-12-31']
@@ -93,10 +93,11 @@ test_portfolio_values = [10000] + simulate_trading(agent, test_data)
 
 # Plot the training and testing portfolio values over time
 plt.figure(figsize=(12,6))
-plt.plot(train_data.index, train_portfolio_values, label='Training')
-plt.plot(test_data.index, test_portfolio_values, label='Testing')
-plt.title('Portfolio Value Over Time')
+plt.plot(raw_data.index, raw_data, label='S&P 500', color='grey')
+plt.plot(train_data.index[1:], train_portfolio_values, label='Training Portfolio')
+plt.plot(test_data.index[1:], test_portfolio_values, label='Testing Portfolio')
+plt.title('Portfolio Value and S&P 500 Over Time')
 plt.xlabel('Date')
-plt.ylabel('Portfolio Value ($)')
+plt.ylabel('Value')
 plt.legend()
 plt.show()
