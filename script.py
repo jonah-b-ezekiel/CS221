@@ -99,13 +99,21 @@ test_portfolio_values = [10000] + test_portfolio_values
 train_portfolio_index = pd.date_range(start=train_data.index[0], periods=len(train_portfolio_values))
 test_portfolio_index = pd.date_range(start=test_data.index[0], periods=len(test_portfolio_values))
 
+# Convert to DataFrame for easier manipulation
+df_train_portfolio = pd.DataFrame(train_portfolio_values, index=train_portfolio_index, columns=['Portfolio'])
+df_test_portfolio = pd.DataFrame(test_portfolio_values, index=test_portfolio_index, columns=['Portfolio'])
+
+# Normalize portfolio values
+df_train_portfolio['Portfolio'] = (df_train_portfolio['Portfolio'] - df_train_portfolio['Portfolio'].min()) / (df_train_portfolio['Portfolio'].max() - df_train_portfolio['Portfolio'].min())
+df_test_portfolio['Portfolio'] = (df_test_portfolio['Portfolio'] - df_test_portfolio['Portfolio'].min()) / (df_test_portfolio['Portfolio'].max() - df_test_portfolio['Portfolio'].min())
+
 # Plot the training and testing portfolio values over time
 plt.figure(figsize=(12,6))
-plt.plot(raw_data.index, raw_data, label='S&P 500', color='grey')
-plt.plot(train_portfolio_index, train_portfolio_values, label='Training Portfolio')
-plt.plot(test_portfolio_index, test_portfolio_values, label='Testing Portfolio')
-plt.title('Portfolio Value and S&P 500 Over Time')
+plt.plot(raw_data.index, data, label='S&P 500', color='grey')
+plt.plot(df_train_portfolio.index, df_train_portfolio['Portfolio'], label='Training Portfolio')
+plt.plot(df_test_portfolio.index, df_test_portfolio['Portfolio'], label='Testing Portfolio')
+plt.title('Normalized Portfolio Value and S&P 500 Over Time')
 plt.xlabel('Date')
-plt.ylabel('Value')
+plt.ylabel('Normalized Value')
 plt.legend()
 plt.show()
