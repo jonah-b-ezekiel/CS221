@@ -88,14 +88,22 @@ test_data = data['2015-01-01':'2023-12-31']
 agent = Agent(lr=0.01, gamma=0.95, e_start=1.0, e_end=0.01, e_decay=0.995)
 
 # Test the agent
-train_portfolio_values = [10000] + simulate_trading(agent, train_data)
-test_portfolio_values = [10000] + simulate_trading(agent, test_data)
+train_portfolio_values = simulate_trading(agent, train_data)
+test_portfolio_values = simulate_trading(agent, test_data)
+
+# Append the initial portfolio value to the beginning of portfolio values
+train_portfolio_values = [10000] + train_portfolio_values
+test_portfolio_values = [10000] + test_portfolio_values
+
+# Create new date indices for the portfolio values
+train_portfolio_index = pd.date_range(start=train_data.index[0], periods=len(train_portfolio_values))
+test_portfolio_index = pd.date_range(start=test_data.index[0], periods=len(test_portfolio_values))
 
 # Plot the training and testing portfolio values over time
 plt.figure(figsize=(12,6))
 plt.plot(raw_data.index, raw_data, label='S&P 500', color='grey')
-plt.plot(train_data.index[1:], train_portfolio_values, label='Training Portfolio')
-plt.plot(test_data.index[1:], test_portfolio_values, label='Testing Portfolio')
+plt.plot(train_portfolio_index, train_portfolio_values, label='Training Portfolio')
+plt.plot(test_portfolio_index, test_portfolio_values, label='Testing Portfolio')
 plt.title('Portfolio Value and S&P 500 Over Time')
 plt.xlabel('Date')
 plt.ylabel('Value')
