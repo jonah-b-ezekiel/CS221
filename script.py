@@ -21,7 +21,7 @@ class PolicyAgent:
             return 'Hold'
 
 class Agent:
-    def __init__(self, lr, gamma, e_start, e_end, e_decay):
+    def __init__(self, lr, gamma, e_start, e_end, e_decay, state_space):
         self.state = None
         self.action = None
         self.lr = lr
@@ -30,8 +30,10 @@ class Agent:
         self.epsilon_min = e_end
         self.epsilon_decay = e_decay
         self.q_table = {}
+        self.state_space = state_space
 
     def get_action(self, state):
+        state = self.discretize(state)
         if random.uniform(0, 1) < self.epsilon:
             action = np.random.choice(['Buy', 'Sell', 'Hold'])
         else:
@@ -39,12 +41,17 @@ class Agent:
             action = ['Buy', 'Sell', 'Hold'][np.argmax(q_values)]
         return action
 
+    def discretize(self, state):
+        return round(state*self.state_space)/self.state_space
+
     def get_q_value(self, state, action):
+        state = self.discretize(state)
         if (state, action) not in self.q_table:
             self.q_table[(state, action)] = 0
         return self.q_table[(state, action)]
 
     def update_q_value(self, reward, next_state):
+        next_state = self.discretize(next_state)
         q_values_next = [self.get_q_value(next_state, a) for a in ['Buy', 'Sell', 'Hold']]
         q_value_next = reward + self.gamma * max(q_values_next)
         if (self.state, self.action) not in self.q_table:
@@ -63,30 +70,42 @@ class Agent:
 def simulate_trading(agent, data, money=10000, stock=0, agent_type='Q'):
     state = data[0]
     if agent_type == 'Q':
+        state = agent.discretize(state)
+        agent.update_state_action(state, 'Hold')
         action = agent.get_action(state)
-        agent.update_state_action(state, action)
+    elif agent_type == 'Policy':
+        action = agent.get_action(money, stock, state)
     portfolio_values = []
-    reward = 0
-    for i in range(1, len(data)):
-        next_state = data[i]
+    for i in range(len(data)):
         if agent_type == 'Q':
-            action = agent.get_action(next_state)
+            state = agent.discretize(state)
+            action = agent.get_action(state)
         else:
-            action = agent.get_action(money, stock, next_state)
-        if action == 'Buy' and money >= next_state:
+            action = agent.get_action(money, stock, state)
+
+        if action == 'Buy' and money >= state:
             stock += 1
-            money -= next_state
+            money -= state
         elif action == 'Sell' and stock > 0:
             stock -= 1
-            money += next_state
-        portfolio_values.append(money + stock*next_state)
+            money += state
+
+        portfolio_value = money + stock
+        portfolio_values.append(portfolio_value)
+        
         if i == len(data)-1:
-            reward = money + stock*next_state
+            reward = portfolio_value
+        else:
+            next_state = data[i+1]
+            reward = money + stock*next_state - portfolio_value
+        
         if agent_type == 'Q':
             agent.update_q_value(reward, next_state)
-            agent.update_state_action(next_state, action)
+            agent.update_state_action(state, action)
             agent.update_epsilon()
+
     return portfolio_values
+
 
 # Download SPY stock data
 raw_data = yf.download('SPY','2000-01-01','2023-12-31')['Close']
@@ -99,7 +118,7 @@ train_data = data['2000-01-01':'2014-12-31']
 test_data = data['2015-01-01':'2023-12-31']
 
 # Create and train the agent
-q_agent = Agent(lr=0.01, gamma=0.95, e_start=1.0, e_end=0.01, e_decay=0.995)
+q_agent = Agent(lr=0.01, gamma=0.95, e_start=1.0, e_end=0.01, e_decay=0.995, state_space=100)
 policy_agent = PolicyAgent(target_allocation=0.6)  # adjust the target allocation as needed
 
 # Train and test the Q-Learning agent
