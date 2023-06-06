@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 # Data Preprocessing
-data = yf.download('AAPL', start='2000-01-01', end='2023-01-01')
+data = yf.download('SPY', start='2000-01-01', end='2023-01-01')
 data['daily_return'] = data['Close'].pct_change()
 
 training_data = data.loc['2000-01-01':'2015-12-31']
@@ -149,6 +149,7 @@ for agent, portfolio in zip([q_learning, sarsa, value_iteration], portfolios_tes
         portfolio.append(portfolio[-1] * (1. + reward))
 
 # Start plotting
+
 fig, ax = plt.subplots()
 
 # Plot the training data portfolios
@@ -160,10 +161,9 @@ for agent, portfolio in portfolios_test.items():
     ax.plot(time_index[-len(portfolio):], portfolio, label=f'{agent} Test')
 
 # Decorate the plot
-ax.set_xlabel('Year')
-ax.set_ylabel('Portfolio Value')
-ax.set_title("Trading Strategy Performance")
+ax.set_xlabel('Year', fontweight="bold", fontsize="14")
+ax.set_ylabel('Portfolio Value', fontweight="bold", fontsize="14")
+ax.set_title("Trading Strategy Performance on SPY", fontweight="bold", fontsize="14")
 ax.legend()
 
 plt.show()
-
