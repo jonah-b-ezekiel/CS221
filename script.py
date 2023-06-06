@@ -15,14 +15,15 @@ class Agent:
         self.epsilon_decay = e_decay
         self.q_table = {}
         self.state_space = state_space
+        self.actions = ['Buy', 'Sell', 'Hold'] # Initialize actions
 
     def get_action(self, state):
         state = self.discretize(state)
         if random.uniform(0, 1) < self.epsilon:
-            action = np.random.choice(['Buy', 'Sell', 'Hold'])
+            action = np.random.choice(self.actions)
         else:
-            q_values = [self.get_q_value(state, a) for a in ['Buy', 'Sell', 'Hold']]
-            action = ['Buy', 'Sell', 'Hold'][np.argmax(q_values)]
+            q_values = [self.get_q_value(state, a) for a in self.actions]
+            action = self.actions[np.argmax(q_values)]
         return action
 
     def discretize(self, state):
@@ -34,13 +35,10 @@ class Agent:
             self.q_table[(state, action)] = 0
         return self.q_table[(state, action)]
 
-    def update_q_value(self, reward, next_state):
-        next_state = self.discretize(next_state)
-        q_values_next = [self.get_q_value(next_state, a) for a in ['Buy', 'Sell', 'Hold']]
-        q_value_next = reward + self.gamma * max(q_values_next)
-        if (self.state, self.action) not in self.q_table:
-            self.q_table[(self.state, self.action)] = 0
-        self.q_table[(self.state, self.action)] += self.lr * (q_value_next - self.get_q_value(self.state, self.action))
+    def update_q_value(self, state, action, reward, next_state):
+        max_q_next_state = max([self.q_table.get((next_state, a), 0.0) for a in self.actions])
+        self.q_table[(state, action)] = self.q_table.get((state, action), 0.0) \
+        + self.lr * (reward + self.gamma * max_q_next_state - self.q_table.get((state, action), 0.0))
 
     def update_epsilon(self):
         if self.epsilon > self.epsilon_min:
@@ -52,23 +50,21 @@ class Agent:
 
 
 class SarsaAgent(Agent):
-    def update_q_value(self, reward, next_state, next_action):
-        next_state = self.discretize(next_state)
-        next_q_value = self.get_q_value(next_state, next_action)
-        if (self.state, self.action) not in self.q_table:
-            self.q_table[(self.state, self.action)] = 0
-        self.q_table[(self.state, self.action)] += self.lr * (reward + self.gamma * next_q_value - self.get_q_value(self.state, self.action))
+    def update_q_value(self, state, action, reward, next_state, next_action):
+        q_next_state_action = self.q_table.get((next_state, next_action), 0.0)
+        self.q_table[(state, action)] = self.q_table.get((state, action), 0.0) \
+        + self.lr * (reward + self.gamma * q_next_state_action - self.q_table.get((state, action), 0.0))
 
 
 class ValueIterationAgent(Agent):
     def __init__(self, lr, gamma, state_space):
-        super().__init__(lr, gamma, None, None, None, state_space)
-        self.v_table = {}
+        super().__init__(lr, gamma, e_start=0, e_end=0, e_decay=0, state_space=state_space)
+        self.init_v()
 
-    def init_v(self, state):
-        state = self.discretize(state)
-        if state not in self.v_table:
-            self.v_table[state] = 0
+    def init_v(self):
+        self.v_table = {}
+        for i in range(self.state_space+1):
+            self.v_table[i/self.state_space] = 0  # Initialize all possible state values
 
     def get_action(self, state):
         state = self.discretize(state)
@@ -77,11 +73,10 @@ class ValueIterationAgent(Agent):
         return action
 
     def update_q_value(self, state, action, reward, next_state):
-        next_state = self.discretize(next_state)
-        # We don't need to calculate q_value_next here, because it's calculated in the update_v_value function.
-        if (state, action) not in self.q_table:
-            self.q_table[(state, action)] = 0
-        self.q_table[(state, action)] = reward + self.gamma * self.v_table[next_state]
+        next_state = self.discretize(next_state)  # Discretize next_state
+        q_value = reward + self.gamma * self.v_table[next_state]
+        self.q_table[(state, action)] = q_value
+        self.v_table[state] = max([self.get_q_value(state, a) for a in self.actions])
     
     def update_v_value(self, state):
         state = self.discretize(state)
@@ -91,16 +86,20 @@ class ValueIterationAgent(Agent):
 
 def simulate_trading(agent, data, money=10000, stock=0, agent_type='Q'):
     state = data[0]
-    if agent_type == 'Value':
-        agent.init_v(state)
-    else:
+    if agent_type == 'Q' or agent_type == 'Sarsa':
         state = agent.discretize(state)
         agent.update_state_action(state, 'Hold')
+        action = agent.get_action(state)
+    elif agent_type == 'Value':
+        action = agent.get_action(state)
 
     portfolio_values = []
     for i in range(len(data)):
-        state = agent.discretize(state)
-        action = agent.get_action(state)
+        if agent_type == 'Q' or agent_type == 'Sarsa':
+            state = agent.discretize(state)
+            action = agent.get_action(state)
+        elif agent_type == 'Value':
+            action = agent.get_action(state)
 
         if action == 'Buy' and money >= state:
             stock += 1
@@ -119,20 +118,20 @@ def simulate_trading(agent, data, money=10000, stock=0, agent_type='Q'):
             reward = money + stock*next_state - portfolio_value
         
         if agent_type == 'Q':
-            agent.update_q_value(reward, next_state)
+            agent.update_q_value(state, action, reward, next_state)
             agent.update_state_action(state, action)
             agent.update_epsilon()
         elif agent_type == 'Sarsa':
             next_action = agent.get_action(next_state)
-            agent.update_q_value(reward, next_state, next_action)
+            agent.update_q_value(state, action, reward, next_state, next_action)
             agent.update_state_action(state, action)
             agent.update_epsilon()
         elif agent_type == 'Value':
             agent.update_q_value(state, action, reward, next_state)
-            agent.update_v_value(next_state)
             agent.update_state_action(state, action)
 
     return portfolio_values
+
 
 # Create and train the agents
 q_agent = Agent(lr=0.01, gamma=0.95, e_start=1.0, e_end=0.01, e_decay=0.995, state_space=100)
